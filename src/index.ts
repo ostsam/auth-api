@@ -1,42 +1,49 @@
 import swagger from "@elysiajs/swagger";
 import { Elysia, status } from "elysia";
+import { bearer } from "@elysiajs/bearer";
 
 const PORT = 3000;
 
-const validApiKeys = new Set(["api-key-123", "api-key-456"]);
+const users = [
+  {
+    id: 1,
+    username: "admin",
+    password: "admin123",
+    role: "admin",
+    secret: "admin-secret-123",
+  },
+  {
+    id: 2,
+    username: "user",
+    password: "user123",
+    role: "basic",
+    secret: "user-secret-456",
+  },
+];
+
 
 const protectedRoutes = new Elysia()
-  .derive({ as: "local" }, (request) => {
+  .derive(({ headers }) => {
+    const auth = headers["authorization"];
     return {
-      user: { name: "sam", role: "admin" },
-      isAuthenticated: true,
+      bearer: auth?.startsWith("Bearer") ? auth.slice(7) : null,
     };
   })
-  .onBeforeHandle({ as: "local" }, (request) => {
-    const headers = request.headers;
-    const apiKey = headers["x-api-key"];
+  .get(
+    "/api/protected",
+    (bearer) => {
+      console.log(bearer);
+      return { message: "Get out of here!" };
+    },
+    {
+      beforeHandle({ bearer }) {
+        if (!bearer) return status(401);
+        const filtered = users.filter((u) => u.secret === bearer && u.role === "admin")
+        if (filtered.length == 0) return status(401)
 
-    if (!apiKey) return status(401);
-
-    const isAuthenticated = validApiKeys.has(apiKey);
-
-    if (!isAuthenticated) return status(401);
-
-    if (request.user.role !== "admin") return status(401);
-  })
-  .get("/protected", () => {
-    return {
-      message: "[hacker voice] you're in. now try /protected-with-context",
-    };
-  })
-  .get("/protected-with-context", ({ user, isAuthenticated }) => {
-    return {
-      message: "Enhance the pixels.",
-      user: user,
-      authenticated: isAuthenticated,
-    };
-  });
-
+      },
+    }
+  );
 const app = new Elysia()
   .use(swagger({ path: "/api-docs" }))
   .get("/", () => {
