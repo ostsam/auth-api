@@ -1,5 +1,5 @@
 import swagger from "@elysiajs/swagger";
-import { Elysia, status } from "elysia";
+import { Elysia, status, t } from "elysia";
 import { bearer } from "@elysiajs/bearer";
 
 const PORT = 3000;
@@ -21,7 +21,6 @@ const users = [
   },
 ];
 
-
 const protectedRoutes = new Elysia()
   .derive(({ headers }) => {
     const auth = headers["authorization"];
@@ -38,9 +37,10 @@ const protectedRoutes = new Elysia()
     {
       beforeHandle({ bearer }) {
         if (!bearer) return status(401);
-        const filtered = users.filter((u) => u.secret === bearer && u.role === "admin")
-        if (filtered.length == 0) return status(401)
-
+        const filtered = users.filter(
+          (u) => u.secret === bearer && u.role === "admin"
+        );
+        if (filtered.length == 0) return status(401);
       },
     }
   );
@@ -50,6 +50,21 @@ const app = new Elysia()
     return { message: "this is a public directory" };
   })
   .use(protectedRoutes)
+  .post(
+    "/api/login",
+    ({ body: { username, password } }) => {
+      const verifiedUser = users.filter(
+        (u) => u.username == username && u.password == password
+      );
+      if (!verifiedUser.length) return status(401);
+    },
+    {
+      body: t.Object({
+        username: t.String(),
+        password: t.String(),
+      }),
+    }
+  )
   .listen(PORT);
 
 console.log(
