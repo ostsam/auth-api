@@ -1,6 +1,6 @@
 import swagger from "@elysiajs/swagger";
 import { Elysia, status, t } from "elysia";
-import { bearer } from "@elysiajs/bearer";
+import jwt from "@elysiajs/jwt";
 
 const PORT = 3000;
 
@@ -28,6 +28,26 @@ const protectedRoutes = new Elysia()
       bearer: auth?.startsWith("Bearer") ? auth.slice(7) : null,
     };
   })
+  .use(
+    jwt({
+      name: "jwt",
+      secret:
+        "739dddaf3e4c19f75921fa6823563402165a50a1a9de9784a8056766b50a2291",
+    })
+  )
+  .get("sign/:name", async ({ jwt, params: { name }, cookie: { auth } }) => {
+    const value = await jwt.sign({ name });
+
+    auth.set({
+      value,
+      httpOnly: true,
+      maxAge: 7 * 86400,
+      path: "/api/login",
+    });
+
+    return `Sign in as ${value}`;
+  })
+
   .get(
     "/api/protected",
     (bearer) => {
@@ -52,11 +72,16 @@ const app = new Elysia()
   .use(protectedRoutes)
   .post(
     "/api/login",
-    ({ body: { username, password } }) => {
+
+    async ({ body: { username, password }, jwt }) => {
       const verifiedUser = users.filter(
         (u) => u.username == username && u.password == password
       );
       if (!verifiedUser.length) return status(401);
+      const role = verifiedUser[0].role;
+      const id = verifiedUser[0].id;
+      const signedJWT = await jwt.sign({ id, role, exp: "1m" });
+      console.log(signedJWT);
     },
     {
       body: t.Object({
