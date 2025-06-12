@@ -72,8 +72,7 @@ const app = new Elysia()
   .use(protectedRoutes)
   .post(
     "/api/login",
-
-    async ({ body: { username, password }, jwt }) => {
+    async ({ body: { username, password }, jwt, cookie: { auth } }) => {
       const verifiedUser = users.filter(
         (u) => u.username == username && u.password == password
       );
@@ -82,6 +81,13 @@ const app = new Elysia()
       const id = verifiedUser[0].id;
       const signedJWT = await jwt.sign({ id, role, exp: "1m" });
       console.log(signedJWT);
+      auth.set({
+        value: signedJWT,
+        expires: new Date(Date() + 3600 * 1000 * 24),
+      });
+      console.log(auth);
+      console.log("set auth.value:", auth.value);
+      console.log("set auth.expires:", auth.expires);
     },
     {
       body: t.Object({
