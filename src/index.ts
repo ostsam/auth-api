@@ -1,7 +1,7 @@
 import swagger from "@elysiajs/swagger";
 import { Elysia, status, t } from "elysia";
 import jwt from "@elysiajs/jwt";
-
+//
 const PORT = 3000;
 
 const users = [
@@ -55,12 +55,19 @@ const protectedRoutes = new Elysia()
       return { message: "Get out of here!" };
     },
     {
-      beforeHandle({ bearer }) {
+      async beforeHandle({ bearer, cookie: { auth }, jwt, redirect }) {
         if (!bearer) return status(401);
         const filtered = users.filter(
           (u) => u.secret === bearer && u.role === "admin"
         );
         if (filtered.length == 0) return status(401);
+        if (!auth) {
+          return status(401);
+        }
+
+        const decodeAuth = await jwt.verify(auth.value);
+        if (!decodeAuth) return status(401);
+        if (decodeAuth.role != "admin") return status(401);
       },
     }
   );
@@ -72,8 +79,7 @@ const app = new Elysia()
   .use(protectedRoutes)
   .post(
     "/api/login",
-
-    async ({ body: { username, password }, jwt }) => {
+    async ({ body: { username, password }, jwt, cookie: { auth } }) => {
       const verifiedUser = users.filter(
         (u) => u.username == username && u.password == password
       );
@@ -82,6 +88,13 @@ const app = new Elysia()
       const id = verifiedUser[0].id;
       const signedJWT = await jwt.sign({ id, role, exp: "1m" });
       console.log(signedJWT);
+      auth.set({
+        value: signedJWT,
+        expires: new Date(Date.now() + 3600 * 1000 * 24),
+      });
+      console.log(auth);
+      console.log("auth.value is:", auth.value);
+      console.log("auth expires at:", auth.expires);
     },
     {
       body: t.Object({
