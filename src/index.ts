@@ -55,12 +55,19 @@ const protectedRoutes = new Elysia()
       return { message: "Get out of here!" };
     },
     {
-      beforeHandle({ bearer }) {
+      async beforeHandle({ bearer, cookie: { auth }, jwt, redirect }) {
         if (!bearer) return status(401);
         const filtered = users.filter(
           (u) => u.secret === bearer && u.role === "admin"
         );
         if (filtered.length == 0) return status(401);
+        if (!auth) {
+          return status(401);
+        }
+
+        const decodeAuth = await jwt.verify(auth.value);
+        if (!decodeAuth) return status(401);
+        if (decodeAuth.role != "admin") return status(401);
       },
     }
   );
@@ -83,11 +90,11 @@ const app = new Elysia()
       console.log(signedJWT);
       auth.set({
         value: signedJWT,
-        expires: new Date(Date() + 3600 * 1000 * 24),
+        expires: new Date(Date.now() + 3600 * 1000 * 24),
       });
       console.log(auth);
-      console.log("set auth.value:", auth.value);
-      console.log("set auth.expires:", auth.expires);
+      console.log("auth.value is:", auth.value);
+      console.log("auth expires at:", auth.expires);
     },
     {
       body: t.Object({
